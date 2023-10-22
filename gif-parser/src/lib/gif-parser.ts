@@ -5,6 +5,8 @@ import {
   GifTableReaderOptions,
   GraphicsControlExtension,
   HeaderBlock,
+  Image,
+  ImageDescriptor,
   LabColor,
   LogicalScreenDescriptor,
 } from './types';
@@ -22,6 +24,7 @@ export class GifParser {
   protected globalColorTable: Color[] | undefined = undefined;
   protected graphicsControlExtension: GraphicsControlExtension | undefined =
     undefined;
+  protected images: Image[] | undefined = undefined;
 
   public constructor(protected readonly options: GifTableReaderOptions) {
     this.binValue = this.loadGif(options.filePath);
@@ -35,6 +38,7 @@ export class GifParser {
     this.graphicsControlExtension = this.parseGraphicsControlExtension(
       this.binValue
     );
+    this.images = this.parseImages(this.binValue);
   }
 
   /**
@@ -106,6 +110,129 @@ export class GifParser {
       })()
     );
   }
+  /**
+   * Retrieves the images.
+   *
+   * @return {Image[]} The array of images.
+   */
+  //
+  public getImages(): Image[] {
+    return (
+      this.images ??
+      (() => {
+        throw new Error('The images is undefined');
+      })()
+    );
+  }
+
+  /**
+   * Parses the given buffer and extracts the images.
+   *
+   * @param {Buffer} buffer - The buffer to parse.
+   * @return {Image[]} An array of Image objects representing the extracted images.
+   */
+  private parseImages(buffer: Buffer): Image[] {
+    const images: Image[] = [];
+
+    let offset = 7; // Skip the logical screen descriptor
+
+    while (offset < buffer.length) {
+      if (buffer[offset] !== 0x2c) {
+        // Not an image descriptor, skip to the next byte
+        offset++;
+        continue;
+      }
+
+      const imageDescriptorBuffer = buffer.subarray(offset + 1, offset + 11);
+      const imageDescriptor = this.parseImageDescriptor(imageDescriptorBuffer);
+
+      offset += 11;
+
+      let localColorTable: Color[] | undefined;
+      if (imageDescriptor.localColorTableFlag) {
+        // Parse the local color table
+        const localColorTableSize = Math.pow(
+          2,
+          (imageDescriptor.localColorTableSize & 0b00000111) + 1
+        );
+        const localColorTableBuffer = buffer.subarray(
+          offset,
+          offset + 3 * localColorTableSize
+        );
+        localColorTable = this.parseColorTable(localColorTableBuffer);
+
+        offset += 3 * localColorTableSize;
+      }
+
+      // Skip the LZW minimum code size byte
+      offset++;
+
+      // Parse the image data
+      const imageData = this.parseImageData(buffer, offset);
+
+      const image: Image = {
+        imageDescriptor,
+        localColorTable,
+        imageData,
+      };
+
+      images.push(image);
+
+      // Skip to the next image descriptor
+      offset += imageData.length + 1;
+    }
+
+    return images;
+  }
+
+  /**
+   * Parses the image descriptor from the given buffer.
+   *
+   * @param {Buffer} buffer - The buffer containing the image descriptor.
+   * @return {ImageDescriptor} The parsed image descriptor.
+   */
+  private parseImageDescriptor(buffer: Buffer): ImageDescriptor {
+    const packed = buffer[9];
+
+    const imageDescriptor: ImageDescriptor = {
+      imageLeftPosition: buffer.readUInt16LE(0),
+      imageTopPosition: buffer.readUInt16LE(2),
+      imageWidth: buffer.readUInt16LE(4),
+      imageHeight: buffer.readUInt16LE(6),
+      localColorTableFlag: Boolean(packed & 0b10000000),
+      interlaceFlag: Boolean(packed & 0b01000000),
+      localColorTableSize: packed & 0b00000111,
+    };
+
+    return imageDescriptor;
+  }
+
+  /**
+   * Parses the image data from the given buffer.
+   *
+   * @param {Buffer} buffer - The buffer containing the image data.
+   * @param {number} offset - The starting offset in the buffer.
+   * @return {Buffer} - The parsed image data as a Buffer.
+   */
+  private parseImageData(buffer: Buffer, offset: number): Buffer {
+    const imageData: number[] = [];
+
+    // Skip the LZW minimum code size byte
+    offset++;
+
+    while (buffer[offset] !== 0x00) {
+      const blockSize = buffer[offset];
+      offset++;
+
+      for (let i = 0; i < blockSize; i++) {
+        imageData.push(buffer[offset]);
+        offset++;
+      }
+    }
+
+    // Convert the array of numbers to a Buffer
+    return Buffer.from(imageData);
+  }
 
   /**
    * Parses the global color table from the given buffer.
@@ -131,11 +258,20 @@ export class GifParser {
       13,
       13 + 3 * colorTableSize
     );
+
+    const colors: Color[] = this.parseColorTable(colorTableBuffer);
+
+    return colors;
+  }
+
+  private parseColorTable(buffer: Buffer): Color[] {
     const colors: Color[] = [];
-    for (let i = 0; i < colorTableSize; i++) {
-      const red: number = colorTableBuffer[i * 3];
-      const green: number = colorTableBuffer[i * 3 + 1];
-      const blue: number = colorTableBuffer[i * 3 + 2];
+
+    for (let i = 0; i < buffer.length; i += 3) {
+      const red = buffer[i];
+      const green = buffer[i + 1];
+      const blue = buffer[i + 2];
+
       const color: Color = {
         rgbValues: { r: red, g: green, b: blue },
         hexValue: {
@@ -144,8 +280,10 @@ export class GifParser {
         },
         labValues: this.convertRGBToLab(red, green, blue),
       };
+
       colors.push(color);
     }
+
     return colors;
   }
 

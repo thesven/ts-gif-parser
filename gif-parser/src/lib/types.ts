@@ -1,3 +1,5 @@
+import { type } from 'os';
+
 /**
  * provides a type for a hex colour
  */
@@ -63,9 +65,30 @@ export type GraphicsControlExtension = {
 };
 
 /**
+ * provides Image Descriptor type
+ */
+export type ImageDescriptor = {
+  imageLeftPosition: number;
+  imageTopPosition: number;
+  imageWidth: number;
+  imageHeight: number;
+  localColorTableFlag: boolean;
+  interlaceFlag: boolean;
+  localColorTableSize: number;
+};
+
+/**
+ * Provides Image Type
+ */
+export type Image = {
+  imageDescriptor: ImageDescriptor;
+  localColorTable?: Color[];
+  imageData: Buffer;
+};
+
+/**
  * provides options for the table reader
  */
 export type GifTableReaderOptions = {
-  outputFormat: 'HEX';
   filePath: string;
 };
