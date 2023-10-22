@@ -17,6 +17,12 @@ export const main = async () => {
     '[LOGICAL SCREEN DESCRIPTOR]',
     JSON.stringify(gif.getLogicalScreenDescriptor())
   );
+
+  //global color table
+  console.log(
+    '[GLOBAL COLOR TABLE]',
+    JSON.stringify(gif.getGlobalColorTable())
+  );
 };
 
 main().then(() => {

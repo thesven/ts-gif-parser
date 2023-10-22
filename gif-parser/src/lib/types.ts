@@ -1,33 +1,32 @@
 /**
- * provides a base type for a color
- */
-export type Color = {
-  rawValue: string;
-};
-
-/**
  * provides a type for a hex colour
  */
-export type HexColour = Color & {
+export type HexColour = {
   value: string;
 };
 
 /**
  * provides a type for a rgb colour
  */
-export type RgbColour = Color & {
+export type RgbColour = {
   r: number;
   g: number;
   b: number;
 };
 
 /**
- * provides a type for a lab colour
+ * provides lab color type
  */
-export type LabColour = Color & {
+export type LabColor = {
   l: number;
   a: number;
   b: number;
+};
+
+export type Color = {
+  rgbValues: RgbColour;
+  labValues: LabColor;
+  hexValue: HexColour;
 };
 
 /**
@@ -56,6 +55,6 @@ export type LogicalScreenDescriptor = {
  * provides options for the table reader
  */
 export type GifTableReaderOptions = {
-  outputFormat: 'HEX' | 'RBG' | 'LAB';
+  outputFormat: 'HEX';
   filePath: string;
 };

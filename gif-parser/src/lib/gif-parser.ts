@@ -1,8 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  Color,
   GifTableReaderOptions,
   HeaderBlock,
+  LabColor,
   LogicalScreenDescriptor,
 } from './types';
 
@@ -16,6 +18,7 @@ export class GifParser {
   protected logicalScreenDescriptor: LogicalScreenDescriptor | undefined =
     undefined;
   protected hasGlobalColorTable: boolean | undefined = undefined;
+  protected globalColorTable: Color[] | undefined = undefined;
 
   public constructor(protected readonly options: GifTableReaderOptions) {
     this.binValue = this.loadGif(options.filePath);
@@ -25,6 +28,7 @@ export class GifParser {
     );
     this.hasGlobalColorTable =
       this.logicalScreenDescriptor.globalColorTableFlag;
+    this.globalColorTable = this.parseGlobalColorTable(this.binValue);
   }
 
   /**
@@ -69,6 +73,54 @@ export class GifParser {
     );
   }
 
+  public getGlobalColorTable(): Color[] {
+    return (
+      this.globalColorTable ??
+      (() => {
+        throw new Error('The globalColorTable is undefined');
+      })()
+    );
+  }
+
+  /**
+   * Parses the global color table from the given buffer.
+   *
+   * @param {Buffer} buffer - The buffer containing the global color table.
+   * @return {Color[]} An array of Color objects representing the colors in the global color table.
+   */
+  private parseGlobalColorTable(buffer: Buffer): Color[] {
+    if (!this.hasGlobalColorTable) {
+      return [];
+    }
+    if (!this.logicalScreenDescriptor) {
+      throw new Error(
+        'The logicalScreenDescriptor is undefined. This should not happen.'
+      );
+    }
+    // The global color table immediately follows the logical screen descriptor and has a length of 3 * 2^(N+1) bytes
+    const colorTableSize: number = Math.pow(
+      2,
+      this.logicalScreenDescriptor.colorResolution + 1
+    );
+    const colorTableBuffer: Buffer = buffer.slice(13, 13 + 3 * colorTableSize);
+    const colors: Color[] = [];
+    for (let i = 0; i < colorTableSize; i++) {
+      const red: number = colorTableBuffer[i * 3];
+      const green: number = colorTableBuffer[i * 3 + 1];
+      const blue: number = colorTableBuffer[i * 3 + 2];
+      const color: Color = {
+        rgbValues: { r: red, g: green, b: blue },
+        hexValue: {
+          value:
+            '#' + red.toString(16) + green.toString(16) + blue.toString(16),
+        },
+        labValues: this.convertRGBToLab(red, green, blue),
+      };
+      colors.push(color);
+    }
+    return colors;
+  }
+
   /**
    * Parses the logical screen descriptor from the given buffer.
    *
@@ -83,7 +135,7 @@ export class GifParser {
     const height = descriptorBuffer.readUInt16LE(2);
     const globalColorTableFlag = Boolean(descriptorBuffer[4] & 0b10000000);
     const colorResolution = (descriptorBuffer[4] & 0b01110000) >> 4;
-    const colorResolutionValue = 1 << colorResolution;
+    const colorResolutionValue = Math.pow(2, colorResolution + 1);
     const sortFlag = Boolean(descriptorBuffer[4] & 0b00001000);
     const backgroundColorIndex = descriptorBuffer[5];
     const pixelAspectRatio = descriptorBuffer[6];
@@ -131,5 +183,46 @@ export class GifParser {
       console.error(`Error loading GIF file: ${error}`);
       throw error;
     }
+  }
+
+  /**
+   * Converts an RGB color to a LAB color.
+   *
+   * @param {number} r - The red component of the RGB color (0-255).
+   * @param {number} g - The green component of the RGB color (0-255).
+   * @param {number} b - The blue component of the RGB color (0-255).
+   * @return {LabColor} The LAB color.
+   */
+  private convertRGBToLab(r: number, g: number, b: number): LabColor {
+    // Convert RGB to XYZ
+    const sr = r / 255;
+    const sg = g / 255;
+    const sb = b / 255;
+    const rLinear = sr <= 0.04045 ? sr / 12.92 : ((sr + 0.055) / 1.055) ** 2.4;
+    const gLinear = sg <= 0.04045 ? sg / 12.92 : ((sg + 0.055) / 1.055) ** 2.4;
+    const bLinear = sb <= 0.04045 ? sb / 12.92 : ((sb + 0.055) / 1.055) ** 2.4;
+    const x = rLinear * 0.4124 + gLinear * 0.3576 + bLinear * 0.1805;
+    const y = rLinear * 0.2126 + gLinear * 0.7152 + bLinear * 0.0722;
+    const z = rLinear * 0.0193 + gLinear * 0.1192 + bLinear * 0.9505;
+
+    // Convert XYZ to LAB
+    const xn = 0.95047;
+    const yn = 1.0;
+    const zn = 1.08883;
+    const xN = x / xn;
+    const yN = y / yn;
+    const zN = z / zn;
+    const f = (t: number) =>
+      t > (6 / 29) ** 3 ? t ** (1 / 3) : (1 / 3) * (29 / 6) ** 2 * t + 4 / 29;
+
+    const lValue = 116 * f(yN) - 16;
+    const aValue = 500 * (f(xN) - f(yN));
+    const bValue = 200 * (f(yN) - f(zN));
+
+    return {
+      l: lValue,
+      a: aValue,
+      b: bValue,
+    } as LabColor;
   }
 }
