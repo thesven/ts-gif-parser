@@ -52,6 +52,17 @@ export type LogicalScreenDescriptor = {
 };
 
 /**
+ * provides Graphics Control Extension type
+ */
+export type GraphicsControlExtension = {
+  disposalMethod: number;
+  userInputFlag: boolean;
+  transparentColorFlag: boolean;
+  delayTime: number;
+  transparentColorIndex: number;
+};
+
+/**
  * provides options for the table reader
  */
 export type GifTableReaderOptions = {

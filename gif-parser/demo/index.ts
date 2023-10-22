@@ -23,6 +23,12 @@ export const main = async () => {
     '[GLOBAL COLOR TABLE]',
     JSON.stringify(gif.getGlobalColorTable())
   );
+
+  // graphics control extension
+  console.log(
+    '[GRAPHICS CONTROL EXTENSION]',
+    JSON.stringify(gif.getGraphicsControlExtension())
+  );
 };
 
 main().then(() => {

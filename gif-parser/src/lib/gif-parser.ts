@@ -3,6 +3,7 @@ import * as path from 'path';
 import {
   Color,
   GifTableReaderOptions,
+  GraphicsControlExtension,
   HeaderBlock,
   LabColor,
   LogicalScreenDescriptor,
@@ -19,6 +20,8 @@ export class GifParser {
     undefined;
   protected hasGlobalColorTable: boolean | undefined = undefined;
   protected globalColorTable: Color[] | undefined = undefined;
+  protected graphicsControlExtension: GraphicsControlExtension | undefined =
+    undefined;
 
   public constructor(protected readonly options: GifTableReaderOptions) {
     this.binValue = this.loadGif(options.filePath);
@@ -29,6 +32,9 @@ export class GifParser {
     this.hasGlobalColorTable =
       this.logicalScreenDescriptor.globalColorTableFlag;
     this.globalColorTable = this.parseGlobalColorTable(this.binValue);
+    this.graphicsControlExtension = this.parseGraphicsControlExtension(
+      this.binValue
+    );
   }
 
   /**
@@ -73,11 +79,30 @@ export class GifParser {
     );
   }
 
+  /**
+   * Retrieves the global color table.
+   *
+   * @return {Color[]} The global color table.
+   */
   public getGlobalColorTable(): Color[] {
     return (
       this.globalColorTable ??
       (() => {
         throw new Error('The globalColorTable is undefined');
+      })()
+    );
+  }
+
+  /**
+   * Retrieves the graphics control extension.
+   *
+   * @return {GraphicsControlExtension} The graphics control extension.
+   */
+  public getGraphicsControlExtension(): GraphicsControlExtension {
+    return (
+      this.graphicsControlExtension ??
+      (() => {
+        throw new Error('The graphicsControlExtension is undefined');
       })()
     );
   }
@@ -102,7 +127,10 @@ export class GifParser {
       2,
       this.logicalScreenDescriptor.colorResolution + 1
     );
-    const colorTableBuffer: Buffer = buffer.slice(13, 13 + 3 * colorTableSize);
+    const colorTableBuffer: Buffer = buffer.subarray(
+      13,
+      13 + 3 * colorTableSize
+    );
     const colors: Color[] = [];
     for (let i = 0; i < colorTableSize; i++) {
       const red: number = colorTableBuffer[i * 3];
@@ -121,6 +149,23 @@ export class GifParser {
     return colors;
   }
 
+  private parseGraphicsControlExtension(
+    buffer: Buffer
+  ): GraphicsControlExtension {
+    const disposalMethod = (buffer[3] & 0b00011100) >> 2;
+    const userInputFlag = Boolean(buffer[3] & 0b00000010);
+    const transparentColorFlag = Boolean(buffer[3] & 0b00000001);
+    const delayTime = buffer.readUInt16LE(4);
+    const transparentColorIndex = buffer[6];
+    return {
+      disposalMethod,
+      userInputFlag,
+      transparentColorFlag,
+      delayTime,
+      transparentColorIndex,
+    };
+  }
+
   /**
    * Parses the logical screen descriptor from the given buffer.
    *
@@ -130,7 +175,7 @@ export class GifParser {
   private parseLogicalScreenDescriptor(
     buffer: Buffer
   ): LogicalScreenDescriptor {
-    const descriptorBuffer = buffer.slice(6, 13);
+    const descriptorBuffer = buffer.subarray(6, 13);
     const width = descriptorBuffer.readUInt16LE(0);
     const height = descriptorBuffer.readUInt16LE(2);
     const globalColorTableFlag = Boolean(descriptorBuffer[4] & 0b10000000);
@@ -159,8 +204,8 @@ export class GifParser {
    * @return {HeaderBlock} The parsed header block.
    */
   private parseHeaderBlock(buffer: Buffer): HeaderBlock {
-    const signature: string = buffer.slice(0, 3).toString();
-    const version: string = buffer.slice(3, 6).toString();
+    const signature: string = buffer.subarray(0, 3).toString();
+    const version: string = buffer.subarray(3, 6).toString();
     const headerBlock: HeaderBlock = {
       signature,
       version,
