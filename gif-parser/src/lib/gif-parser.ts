@@ -264,6 +264,12 @@ export class GifParser {
     return colors;
   }
 
+  /**
+   * Parses the color table from a buffer and returns an array of colors.
+   *
+   * @param {Buffer} buffer - The buffer containing the color table.
+   * @return {Color[]} An array of colors parsed from the buffer.
+   */
   private parseColorTable(buffer: Buffer): Color[] {
     const colors: Color[] = [];
 
@@ -287,6 +293,12 @@ export class GifParser {
     return colors;
   }
 
+  /**
+   * Parses the graphics control extension from the given buffer.
+   *
+   * @param {Buffer} buffer - The buffer containing the graphics control extension.
+   * @return {GraphicsControlExtension} The parsed graphics control extension.
+   */
   private parseGraphicsControlExtension(
     buffer: Buffer
   ): GraphicsControlExtension {
