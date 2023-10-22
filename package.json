@@ -1,0 +1,12 @@
+{
+  "name": "gif-table-reader",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {},
+  "private": true,
+  "dependencies": {},
+  "devDependencies": {
+    "@nx/js": "17.0.1",
+    "nx": "17.0.1"
+  }
+}
