@@ -75,9 +75,3 @@ The `Image` type represents an image frame in the GIF file. It has the following
 - `width`: The width of the image in pixels.
 - `height`: The height of the image in pixels.
 - `imageData`: A `Buffer` object containing the image data
-
-This library was generated with [Nx](https://nx.dev).
-
-## Building
-
-Run `pnpm nx run @mikesven/gif-parser:build` to build the library.
